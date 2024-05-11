@@ -1,0 +1,73 @@
+import sqlite3
+import telepot
+from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
+
+# Connect to SQLite database
+conn = sqlite3.connect('bot_data.db')
+cur = conn.cursor()
+
+# Create table if not exists
+cur.execute('''CREATE TABLE IF NOT EXISTS user_data
+               (id INTEGER PRIMARY KEY, user_id INTEGER, balance INTEGER)''')
+conn.commit()
+
+# Define a function to handle incoming messages
+def handle(msg):
+    chat_id = msg['chat']['id']
+    user_id = msg['from']['id']
+    command = msg['text']
+
+    # Check the command received and respond accordingly
+    if command == '/start':
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text='اضافة رصيد', callback_data='add_balance')],
+            [InlineKeyboardButton(text='حضر مستخدم', callback_data='ban_user')]
+        ])
+        bot.sendMessage(chat_id, "👋 مرحبًا بك في البوت!\nاختر الخيار المناسب:", reply_markup=keyboard)
+    elif command == '/info':
+        show_user_balance(user_id, chat_id)
+
+# Define a function to handle callback queries (button clicks)
+def on_callback_query(msg):
+    query_id, chat_id, query_data = telepot.glance(msg, flavor='callback_query')
+    
+    if query_data == 'add_balance':
+        add_balance(user_id, 50)
+        bot.answerCallbackQuery(query_id, text='تمت إضافة 50 درهم إلى رصيدك')
+        show_user_balance(user_id, chat_id)
+    elif query_data == 'ban_user':
+        ban_user(user_id)
+        bot.answerCallbackQuery(query_id, text='تم حظر المستخدم')
+
+# Function to add balance to user
+def add_balance(user_id, amount):
+    cur.execute("INSERT INTO user_data (user_id, balance) VALUES (?, ?)", (user_id, amount))
+    conn.commit()
+
+# Function to ban user
+def ban_user(user_id):
+    cur.execute("DELETE FROM user_data WHERE user_id=?", (user_id,))
+    conn.commit()
+
+# Function to show user balance
+def show_user_balance(user_id, chat_id):
+    cur.execute("SELECT balance FROM user_data WHERE user_id=?", (user_id,))
+    result = cur.fetchone()
+    if result:
+        balance = result[0]
+        bot.sendMessage(chat_id, f"💸 رصيدك الحالي هو: {balance} درهم")
+    else:
+        bot.sendMessage(chat_id, "لا يوجد رصيد لديك حاليًا")
+
+# Set up the bot, message handler, and callback query handler
+TOKEN = '7085494416:AAH5BwFlPrmaj_DBwhDP4LEtGtU4DnEJPIs'  # Replace with your actual bot token
+
+bot = telepot.Bot(TOKEN)
+bot.message_loop({'chat': handle, 'callback_query': on_callback_query})
+
+print("Listening for messages...")
+
+# Keep the bot running
+while True:
+    pass
+    
